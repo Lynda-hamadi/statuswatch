@@ -44,3 +44,26 @@ jobs:
 
       - name: Build image
         run: docker build -t statuswatch:ci .
+
+  publish-image:
+    needs: [tests, security-audit, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push image
+        run: |
+          IMAGE=ghcr.io/lynda-hamadi/statuswatch
+          docker build \
+            --label org.opencontainers.image.source=https://github.com/Lynda-hamadi/statuswatch \
+            -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
+          docker push $IMAGE:${{ github.sha }}
+          docker push $IMAGE:latest

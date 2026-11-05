@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -6,6 +7,7 @@ from app.checker import run_check
 from app.database import Base, engine, get_db
 from app.models import Check, Target
 from app.schemas import CheckOut, TargetCreate, TargetOut
+from app.status import build_status, render_page
 
 Base.metadata.create_all(bind=engine)
 
@@ -15,6 +17,16 @@ app = FastAPI(title="StatusWatch")
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/", response_class=HTMLResponse)
+def status_page(db: Session = Depends(get_db)):
+    return render_page(build_status(db))
+
+
+@app.get("/status")
+def status(db: Session = Depends(get_db)):
+    return build_status(db)
 
 
 @app.post("/targets", response_model=TargetOut, status_code=201)

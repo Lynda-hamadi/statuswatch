@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: statuswatch
+      POSTGRES_PASSWORD: statuswatch
+      POSTGRES_DB: statuswatch
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U statuswatch -d statuswatch"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    image: statuswatch:local
+    environment:
+      DATABASE_URL: postgresql+psycopg://statuswatch:statuswatch@db:5432/statuswatch
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    image: statuswatch:local
+    pull_policy: never
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://statuswatch:statuswatch@db:5432/statuswatch
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -7,6 +7,7 @@ from app.checker import run_check
 from app.database import Base, engine, get_db
 from app.models import Check, Target
 from app.schemas import CheckOut, TargetCreate, TargetOut
+from app.security import UnsafeTarget, assert_public_url
 from app.status import build_status, render_page
 
 Base.metadata.create_all(bind=engine)
@@ -31,6 +32,11 @@ def status(db: Session = Depends(get_db)):
 
 @app.post("/targets", response_model=TargetOut, status_code=201)
 def create_target(payload: TargetCreate, db: Session = Depends(get_db)):
+    try:
+        assert_public_url(str(payload.url))
+    except UnsafeTarget as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
     target = Target(
         name=payload.name,
         url=str(payload.url),

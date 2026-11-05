@@ -4,6 +4,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.models import Check, Target
+from app.security import UnsafeTarget, assert_public_url
 
 TIMEOUT_SECONDS = 10
 
@@ -15,9 +16,14 @@ def run_check(db: Session, target: Target) -> Check:
     is_up = False
 
     try:
-        response = httpx.get(target.url, timeout=TIMEOUT_SECONDS, follow_redirects=True)
+        assert_public_url(target.url)
+        # Pas de suivi des redirections : une redirection pourrait mener vers une adresse interne.
+        # Un code 3xx est considéré comme « en ligne » (moins de 400).
+        response = httpx.get(target.url, timeout=TIMEOUT_SECONDS, follow_redirects=False)
         status_code = response.status_code
         is_up = response.status_code < 400
+    except UnsafeTarget as exc:
+        error = f"Cible refusée : {exc}"[:300]
     except httpx.HTTPError as exc:
         error = f"{type(exc).__name__}: {exc}"[:300]
 

@@ -45,8 +45,31 @@ jobs:
       - name: Build image
         run: docker build -t statuswatch:ci .
 
+  terraform-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Terraform
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg software-properties-common
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update
+          sudo apt-get install -y terraform
+
+      - run: terraform fmt -check
+
+      - run: terraform init -backend=false
+
+      - run: terraform validate
+
   publish-image:
-    needs: [tests, security-audit, docker-build]
+    needs: [tests, security-audit, docker-build, terraform-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
